@@ -1,3 +1,10 @@
+# tried
+# evaluation
+```bash
+python go2_backflip.py -e single
+python go2_backflip.py -e double
+```
+
 ![Genesis](imgs/big_text.png)
 
 ![Teaser](imgs/teaser.png)

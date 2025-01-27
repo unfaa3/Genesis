@@ -6,6 +6,7 @@ import torch
 from go2_env import Go2Env
 
 import genesis as gs
+import numpy as np
 
 
 def get_cfgs():
@@ -113,6 +114,7 @@ def main():
 
     gs.init()
 
+
     env_cfg, obs_cfg, reward_cfg, command_cfg = get_cfgs()
 
     if args.exp_name == "single":
@@ -122,13 +124,20 @@ def main():
     else:
         raise RuntimeError
 
+     # visualize the target
+    env_cfg["visualize_target"] = True
+    # for video recording
+    env_cfg["visualize_camera"] = True
+    # set the max FPS for visualization
+    env_cfg["max_visualize_FPS"] = 60
+
     env = BackflipEnv(
         num_envs=1,
         env_cfg=env_cfg,
         obs_cfg=obs_cfg,
         reward_cfg=reward_cfg,
         command_cfg=command_cfg,
-        show_viewer=True,
+        show_viewer=False,
     )
 
     policy = torch.jit.load(f"./backflip/{args.exp_name}.pt")
@@ -136,11 +145,16 @@ def main():
 
     obs, _ = env.reset()
     with torch.no_grad():
-        while True:
+        env.cam.start_recording()
+        for i in range(400):
             actions = policy(obs)
             obs, _, rews, dones, infos = env.step(actions)
-
-
+            env.cam.set_pose(
+                pos    = (9.0 * np.sin(i / 60), 9.0 * np.cos(i / 60), 7.5),
+                lookat = (0, 0, 0.5),
+            )
+            env.cam.render()
+        env.cam.stop_recording(save_to_filename="video.mp4", fps=env_cfg["max_visualize_FPS"])
 if __name__ == "__main__":
     main()
 
