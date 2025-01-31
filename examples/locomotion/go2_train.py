@@ -102,6 +102,8 @@ def get_cfgs():
         "action_scale": 0.25,
         "simulate_action_latency": True,
         "clip_actions": 100.0,
+        "visualize_camera": False,
+        "max_visualize_FPS": 60,
     }
     obs_cfg = {
         "num_obs": 45,

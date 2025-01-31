@@ -7,6 +7,7 @@ from go2_env import Go2Env
 
 import genesis as gs
 import numpy as np
+from genesis.utils.geom import transform_by_quat
 
 
 def get_cfgs():
@@ -109,7 +110,8 @@ class BackflipEnv(Go2Env):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("-e", "--exp_name", type=str, default="double")
+    parser.add_argument("-e", "--exp_name", type=str, default="single")
+    parser.add_argument("-v", "--view", type=str, default="side")
     args = parser.parse_args()
 
     gs.init()
@@ -146,15 +148,46 @@ def main():
     obs, _ = env.reset()
     with torch.no_grad():
         env.cam.start_recording()
-        for i in range(400):
+        for i in range(100):
             actions = policy(obs)
             obs, _, rews, dones, infos = env.step(actions)
-            env.cam.set_pose(
-                pos    = (9.0 * np.sin(i / 60), 9.0 * np.cos(i / 60), 7.5),
-                lookat = (0, 0, 0.5),
-            )
+            
+            if args.view == "side":
+                # 侧视角：从右前方45度观察全身
+                env.cam.set_pose(
+                    pos=(2.0, 3.0, 1.0),  # X向右，Y向前，Z向上
+                    lookat=(0.3, 0, 0.3),    # 观察基座中心稍高位置
+                )
+            elif args.view == "front":
+                base_pos = env.base_pos[0].cpu().numpy()
+                base_quat = env.base_quat[0].cpu().numpy()
+                
+                # 摄像头位置：基座前方0.3米，高度0.15米
+                head_offset = transform_by_quat(
+                    torch.tensor([[-0.3, 0.0, 0.15]], device=env.device),
+                    torch.tensor([base_quat], device=env.device)
+                )[0].cpu().numpy()
+                cam_pos = base_pos + head_offset
+                
+                # 观察点：基座前方1米，地面下方0.2米
+                lookat_offset = transform_by_quat(
+                    torch.tensor([[1.0, 0.0, -0.2]], device=env.device),
+                    torch.tensor([base_quat], device=env.device)
+                )[0].cpu().numpy()
+                lookat_pos = base_pos + lookat_offset
+                
+                # 先设置姿态
+                env.cam.set_pose(
+                    pos=cam_pos,
+                    lookat=lookat_pos,
+                )
+                # 再单独设置FOV参数
+                env.cam.set_params(fov=80)  # 设置80度广角
+            
+            # 统一渲染（两个视角都需要）
             env.cam.render()
-        env.cam.stop_recording(save_to_filename="video.mp4", fps=env_cfg["max_visualize_FPS"])
+        filename = f"video_{args.view}.mp4"
+        env.cam.stop_recording(save_to_filename=filename, fps=env_cfg["max_visualize_FPS"])
 if __name__ == "__main__":
     main()
 
